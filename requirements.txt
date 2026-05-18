@@ -1,0 +1,5 @@
+# Librerías esenciales para YOLOv8 y comunicación con Arduino
+ultralytics
+opencv-python
+pyserial
+numpy
