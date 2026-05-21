@@ -1,167 +1,242 @@
 # ModeloHaptic
 
-Sistema de visión por computadora y retroalimentación háptica basado en YOLO y Arduino para detección de objetos en tiempo real.
+Sistema de detección de objetos en tiempo real utilizando YOLO, OpenCV y Arduino con optimización de clases mediante filtrado dinámico del dataset COCO.
 
 ---
 
 # Descripción técnica
 
-ModeloHaptic es un sistema que integra inteligencia artificial, visión por computadora y comunicación serial para detectar objetos mediante una cámara web y transmitir su posición espacial a un microcontrolador Arduino.
+ModeloHaptic es un sistema de visión por computadora orientado a interacción física y retroalimentación háptica.
 
-El proyecto utiliza un modelo personalizado entrenado con YOLO (You Only Look Once) para identificar objetos dentro de cada frame capturado por la cámara. Posteriormente, calcula el centro geométrico de cada objeto detectado y envía la información en formato JSON a través del puerto serial.
+El proyecto utiliza un modelo YOLO basado en el dataset preentrenado COCO, el cual originalmente contiene aproximadamente 80 clases de detección. Sin embargo, el sistema implementa un proceso de *tunneo* y filtrado de clases para reducir únicamente a los objetos relevantes para el proyecto.
 
-La finalidad del sistema es permitir el desarrollo de interfaces hápticas o sistemas físicos capaces de reaccionar a la posición de objetos en tiempo real.
+En lugar de entrenar un modelo completamente desde cero, se aprovecha el conocimiento previo aprendido por YOLO sobre COCO y posteriormente se realiza una especialización enfocada únicamente en ciertas categorías específicas.
+
+Las clases utilizadas actualmente son:
+
+- person
+- bicycle
+- car
+- motorcycle
+- bus
+- train
+- truck
+- traffic light
+- fire hydrant
+- stop sign
+- bench
+
+---
+
+# ¿Qué es el tunneo del modelo?
+
+El proyecto implementa un proceso de optimización sobre el modelo YOLO preentrenado.
+
+El dataset COCO contiene decenas de categorías generales, pero muchas de ellas no son útiles para el sistema háptico. Por esta razón, se realiza un filtrado de clases para:
+
+- Reducir carga computacional
+- Mejorar velocidad de inferencia
+- Aumentar precisión sobre objetos relevantes
+- Disminuir falsos positivos
+- Optimizar el uso en tiempo real
+
+El modelo conserva únicamente las clases necesarias relacionadas con movilidad, entorno urbano y navegación espacial.
 
 ---
 
 # Arquitectura del sistema
 
 ```text
-Cámara Web
-    ↓
-Captura de Frames (OpenCV)
-    ↓
-Inferencia con YOLO
-    ↓
-Extracción de Bounding Boxes
-    ↓
-Cálculo de centro de objetos
-    ↓
-Serialización JSON
-    ↓
-Comunicación Serial UART
-    ↓
-Arduino / Sistema Háptico
+Dataset COCO
+      ↓
+Filtrado de clases relevantes
+      ↓
+Fine-Tuning / Tunneo del modelo YOLO
+      ↓
+Modelo optimizado (best.pt)
+      ↓
+Captura de cámara en tiempo real
+      ↓
+Detección de objetos
+      ↓
+Extracción espacial
+      ↓
+Comunicación serial
+      ↓
+Arduino / Sistema háptico
 ```
 
 ---
 
-# Flujo de funcionamiento
+# Flujo interno del sistema
 
-## 1. Inicialización de conexión serial
+## 1. Modelo base COCO
 
-El sistema establece comunicación serial con Arduino utilizando PySerial.
+YOLO inicia utilizando pesos preentrenados sobre COCO.
+
+COCO proporciona conocimiento general sobre:
+
+- personas
+- vehículos
+- señales
+- objetos urbanos
+- infraestructura vial
+
+---
+
+## 2. Filtrado de clases
+
+El sistema elimina todas las categorías irrelevantes y conserva únicamente las necesarias para el proyecto.
+
+Ejemplo conceptual:
 
 ```python
-arduino = serial.Serial(PUERTO_SERIAL, BAUD_RATE, timeout=1)
+clases_utilizadas = [
+    "person",
+    "car",
+    "bus",
+    "motorcycle",
+    "traffic light",
+    "stop sign"
+]
 ```
 
-Esto permite transmitir información de detección hacia dispositivos físicos externos.
+Esto permite especializar el detector únicamente sobre escenarios urbanos y navegación.
 
 ---
 
-## 2. Carga del modelo YOLO
+# Fine-Tuning del modelo
 
-Se carga un modelo previamente entrenado utilizando Ultralytics YOLO.
+Después del filtrado se realiza un ajuste fino (*fine-tuning*).
 
-```python
-model = YOLO("runs/detect/train/weights/best.pt")
+El objetivo es que el modelo:
+
+- mejore precisión sobre clases seleccionadas
+- reduzca errores
+- aprenda patrones específicos del entorno
+- optimice inferencia en tiempo real
+
+El resultado final se guarda en:
+
+```text
+runs/detect/train/weights/best.pt
 ```
-
-El archivo `best.pt` contiene los pesos del modelo entrenado.
 
 ---
 
-## 3. Captura de video en tiempo real
+# Evaluación del modelo
 
-OpenCV accede a la cámara principal del sistema.
+El sistema utiliza métricas F1-Score para evaluar el rendimiento de cada clase detectada.
+
+## Curva F1-Confidence
+
+La curva F1 mide el balance entre:
+
+- Precision
+- Recall
+
+El mejor punto del modelo ocurre aproximadamente en:
+
+```text
+F1 = 0.63
+Confidence Threshold = 0.242
+```
+
+Esto significa que el modelo obtiene el mejor equilibrio entre precisión y detección usando un umbral de confianza cercano a `0.24`.
+
+Las clases con mejor desempeño son:
+
+- train
+- fire hydrant
+- stop sign
+- bus
+
+Mientras que clases más complejas como:
+
+- bench
+- bicycle
+- traffic light
+
+presentan menor desempeño debido a variaciones visuales y tamaño en imagen.
+
+---
+
+# Funcionamiento del detector
+
+## Captura de video
 
 ```python
 cap = cv2.VideoCapture(0)
 ```
 
-Cada iteración del loop obtiene un nuevo frame.
+La cámara obtiene frames continuamente.
 
 ---
 
-## 4. Inferencia de objetos
-
-Cada frame es procesado por YOLO:
+## Inferencia con YOLO
 
 ```python
 results = model(frame)
 ```
 
-El modelo devuelve:
-
-- Bounding boxes
-- Clases detectadas
-- Nivel de confianza
-- Coordenadas espaciales
+Cada frame es procesado por el modelo optimizado.
 
 ---
 
-## 5. Extracción de información espacial
+## Bounding Boxes
 
-Para cada objeto detectado se obtiene:
+YOLO devuelve:
 
-- Clase del objeto
-- Coordenadas de la caja delimitadora
-- Centro geométrico del objeto
+- coordenadas
+- clase
+- confianza
+- dimensiones del objeto
 
-```python
-x1, y1, x2, y2 = box.xyxy[0].tolist()
-```
+---
 
-Cálculo del centro:
+# Extracción espacial
+
+El sistema calcula el centro geométrico del objeto detectado.
 
 ```python
 centro_x = x1 + (x2 - x1) / 2
 centro_y = y1 + (y2 - y1) / 2
 ```
 
----
-
-# Estructura de datos transmitida
-
-La información enviada al Arduino tiene formato JSON.
-
-Ejemplo:
-
-```json
-[
-  {
-    "objeto": "persona",
-    "centroObj": [320.5, 240.2]
-  }
-]
-```
-
-Esto permite que el microcontrolador interprete fácilmente las posiciones detectadas.
+Esto permite representar espacialmente los objetos para sistemas hápticos.
 
 ---
 
-# Comunicación serial
+# Comunicación serial con Arduino
 
-Los datos son enviados mediante UART serial:
+Las detecciones son enviadas mediante UART serial.
 
 ```python
 arduino.write((datos_json + "\n").encode('utf-8'))
 ```
 
-Parámetros:
+Formato enviado:
 
-| Parámetro | Valor |
-|---|---|
-| Baud Rate | 9600 |
-| Comunicación | UART |
-| Encoding | UTF-8 |
+```json
+[
+  {
+    "objeto": "car",
+    "centroObj": [420.3, 210.8]
+  }
+]
+```
 
 ---
 
-# Visualización en tiempo real
+# Aplicación háptica
 
-El sistema muestra las detecciones directamente sobre el video:
+El Arduino puede utilizar las coordenadas recibidas para:
 
-```python
-annotated_frame = result.plot()
-```
-
-Posteriormente se renderiza utilizando OpenCV:
-
-```python
-cv2.imshow("YOLO Detección en Vivo", annotated_frame)
-```
+- activar motores vibratorios
+- indicar proximidad
+- representar dirección espacial
+- generar alertas físicas
+- construir navegación asistida
 
 ---
 
@@ -169,11 +244,12 @@ cv2.imshow("YOLO Detección en Vivo", annotated_frame)
 
 | Tecnología | Función |
 |---|---|
+| YOLO | Detección de objetos |
+| COCO Dataset | Modelo base preentrenado |
+| OpenCV | Captura y renderizado |
 | Python | Lógica principal |
-| OpenCV | Captura y renderizado de video |
-| Ultralytics YOLO | Detección de objetos |
 | PySerial | Comunicación serial |
-| Arduino | Control físico/háptico |
+| Arduino | Control físico |
 | JSON | Estructura de transmisión |
 
 ---
@@ -199,7 +275,7 @@ modelohaptic/
 
 # Instalación
 
-## 1. Clonar repositorio
+## Clonar repositorio
 
 ```bash
 git clone https://github.com/Pollitobello2005/modelohaptic.git
@@ -208,7 +284,7 @@ cd modelohaptic
 
 ---
 
-## 2. Instalar dependencias
+## Instalar dependencias
 
 ```bash
 pip install -r requirements.txt
@@ -216,7 +292,7 @@ pip install -r requirements.txt
 
 ---
 
-# Dependencias principales
+# Dependencias
 
 ```txt
 ultralytics
@@ -226,9 +302,7 @@ pyserial
 
 ---
 
-# Configuración
-
-Modificar el puerto serial según el Arduino conectado:
+# Configuración serial
 
 ```python
 PUERTO_SERIAL = "COM3"
@@ -243,7 +317,7 @@ BAUD_RATE = 9600
 python YoloCustom.py
 ```
 
-Para salir del sistema:
+Salir:
 
 ```text
 Presionar tecla Q
@@ -251,27 +325,21 @@ Presionar tecla Q
 
 ---
 
-# Aplicaciones potenciales
+# Objetivo del proyecto
 
-- Sistemas hápticos
-- Asistencia para discapacidad visual
-- Robótica autónoma
-- Interfaces físicas inteligentes
-- Sistemas de navegación espacial
-- Sensores de proximidad inteligentes
-- Interacción humano-máquina
+El propósito principal de ModeloHaptic es crear sistemas capaces de interpretar el entorno físico mediante visión artificial y traducir esa información hacia retroalimentación física o háptica.
 
 ---
 
-# Mejoras futuras
+# Futuras mejoras
 
 - Detección de profundidad
 - Integración con ESP32
-- Optimización en edge devices
-- Multi-object tracking
-- Integración con motores vibratorios
+- Seguimiento múltiple de objetos
+- Navegación háptica avanzada
+- Optimización para edge devices
 - Modelos YOLO más ligeros
-- Sistema de mapeo espacial
+- Integración con sensores adicionales
 
 ---
 
