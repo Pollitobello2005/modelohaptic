@@ -70,13 +70,15 @@ Para validar el comportamiento geométrico y la consistencia de las anotaciones 
 
 La siguiente sección muestra la cantidad de instancias por clase, las dimensiones relativas de las cajas y su dispersión o concentración en el plano de los fotogramas.
 
-![Dataset Stats](images/dataset_stats.png)
+![Dataset Stats](runs/detect/train/labels.jpg)
 
 ### Muestras del set de entrenamiento
 
 A continuación se observa un mosaico de imágenes procesadas por el pipeline de Ultralytics, verificando el correcto etiquetado y el proceso de *data augmentation* aplicado a las clases urbanas seleccionadas.
 
-![Dataset Samples](images/dataset_samples.png)
+![Train Batch 0](runs/detect/train/train_batch0.jpg)
+![Train Batch 1](runs/detect/train/train_batch1.jpg)
+![Train Batch 2](runs/detect/train/train_batch2.jpg)
 
 ---
 
@@ -91,9 +93,32 @@ La curva F1 mide el balance óptimo entre Precisión (*Precision*) y Recuperaci�
 - **F1-Score Global:** `0.63`
 - **Umbral de Confianza:** `0.242`
 
-![F1 Curve](images/F1_curve.png)
+![F1 Curve](runs/detect/train/BoxF1_curve.png)
 
 > **Nota de rendimiento:** Las clases con estructuras visuales rígidas y distintivas como `train`, `fire hydrant` y `stop sign` presentan el mejor desempeño. Clases con alta variabilidad morfológica o escala (como `bench` y `traffic light`) muestran un margen de mejora que se abordará en futuras iteraciones.
+
+### Curvas Precision / Recall
+
+![Precision Curve](runs/detect/train/BoxP_curve.png)
+![Recall Curve](runs/detect/train/BoxR_curve.png)
+![PR Curve](runs/detect/train/BoxPR_curve.png)
+
+### Resultados generales del entrenamiento
+
+![Results](runs/detect/train/results.png)
+
+### Matriz de confusión
+
+![Confusion Matrix](runs/detect/train/confusion_matrix.png)
+![Confusion Matrix Normalized](runs/detect/train/confusion_matrix_normalized.png)
+
+### Predicciones de validación
+
+| Labels | Predicciones |
+|--------|--------------|
+| ![val labels 0](runs/detect/train/val_batch0_labels.jpg) | ![val pred 0](runs/detect/train/val_batch0_pred.jpg) |
+| ![val labels 1](runs/detect/train/val_batch1_labels.jpg) | ![val pred 1](runs/detect/train/val_batch1_pred.jpg) |
+| ![val labels 2](runs/detect/train/val_batch2_labels.jpg) | ![val pred 2](runs/detect/train/val_batch2_pred.jpg) |
 
 ---
 
@@ -158,17 +183,33 @@ arduino.write((datos_json + "\n").encode('utf-8'))
 ```
 modelohaptic/
 │
-├── images/
-│   ├── dataset_samples.png
-│   ├── dataset_stats.png
-│   └── F1_curve.png
-│
 ├── runs/
 │   └── detect/
 │       └── train/
-│           └── weights/
-│               └── best.pt
+│           ├── weights/
+│           │   └── best.pt
+│           ├── BoxF1_curve.png
+│           ├── BoxPR_curve.png
+│           ├── BoxP_curve.png
+│           ├── BoxR_curve.png
+│           ├── confusion_matrix.png
+│           ├── confusion_matrix_normalized.png
+│           ├── labels.jpg
+│           ├── results.png
+│           ├── results.csv
+│           ├── predictions.json
+│           ├── args.yaml
+│           ├── train_batch0.jpg
+│           ├── train_batch1.jpg
+│           ├── train_batch2.jpg
+│           ├── val_batch0_labels.jpg
+│           ├── val_batch0_pred.jpg
+│           ├── val_batch1_labels.jpg
+│           ├── val_batch1_pred.jpg
+│           ├── val_batch2_labels.jpg
+│           └── val_batch2_pred.jpg
 │
+├── .gitignore
 ├── YoloCustom.py
 ├── YoloAPF.py
 ├── requirements.txt
